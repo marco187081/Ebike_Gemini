@@ -50,6 +50,7 @@
             height: 100%;
             width: 100%;
             background: #111;
+            transition: all 0.3s ease;
         }
 
         .glass {
@@ -100,13 +101,12 @@
 
         .leaflet-routing-container { display: none !important; }
 
-        .pseudo-fullscreen {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            z-index: 9999 !important;
+        /* Full-Map Mode Toggle */
+        .map-fullscreen-mode #dashboard-panel {
+            display: none;
+        }
+        .map-fullscreen-mode #map-container {
+            grid-column: span 12 / span 12;
         }
 
         #user-marker-icon {
@@ -124,7 +124,8 @@
 
     <div id="app-shell" class="main-container h-full w-full grid grid-cols-12 gap-0">
         
-        <div class="col-span-5 flex flex-col p-4 space-y-4 border-r border-white/10 z-10">
+        <!-- Dashboard Panel -->
+        <div id="dashboard-panel" class="col-span-5 flex flex-col p-4 space-y-4 border-r border-white/10 z-10">
             <div class="flex-grow flex flex-col items-center justify-center glass rounded-2xl relative overflow-hidden">
                 <div class="absolute top-2 left-4 text-xs font-bold uppercase text-green-500 tracking-widest">Geschwindigkeit</div>
                 <div id="speed" class="digital-font text-[110px] mt-2 leading-none text-white">0.0</div>
@@ -176,7 +177,8 @@
             </div>
         </div>
 
-        <div class="col-span-7 relative h-full overflow-hidden">
+        <!-- Map Container -->
+        <div id="map-container" class="col-span-7 relative h-full overflow-hidden">
             <div id="custom-nav-panel">
                 <div class="flex items-start space-x-4">
                     <div id="nav-icon-container" class="bg-green-500/20 p-3 rounded-xl">
@@ -193,7 +195,7 @@
             
             <div class="absolute top-4 right-4 z-[1000] flex flex-col space-y-2">
                 <button id="fullscreen-btn" class="p-3 bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-md rounded-full text-white border border-white/20">
-                    <i data-lucide="maximize-2" class="w-5 h-5"></i>
+                    <i data-lucide="maximize-2" id="fs-icon" class="w-5 h-5"></i>
                 </button>
                 <button id="center-btn" class="p-3 bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-md rounded-full text-white border border-white/20">
                     <i data-lucide="navigation" class="w-5 h-5"></i>
@@ -229,6 +231,7 @@
         let lastTimestamp = null;
         let pathPoints = [];
         let autoFollow = true;
+        let isMapOnlyMode = false;
 
         window.onload = () => {
             lucide.createIcons();
@@ -238,7 +241,7 @@
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(pos => {
                     const coords = [pos.coords.latitude, pos.coords.longitude];
-                    map.setView(coords, 18); // Direkt nah ranzoomen
+                    map.setView(coords, 18);
                     updateUserMarker(pos.coords);
                     updateGpsStatus('ok', 'BEREIT');
                 }, null, { enableHighAccuracy: true });
@@ -246,7 +249,6 @@
         };
 
         function initMap() {
-            // Map init mit Satelliten-Ansicht
             map = L.map('map', { 
                 zoomControl: false, 
                 attributionControl: false
@@ -286,7 +288,7 @@
                 routeWhileDragging: false,
                 addWaypoints: false,
                 draggableWaypoints: false,
-                fitSelectedRoutes: false, // Wir fitten nicht die ganze Route, da wir nah am User bleiben wollen
+                fitSelectedRoutes: false,
                 showAlternatives: false,
                 lineOptions: { styles: [{ color: '#22c55e', weight: 6, opacity: 0.9 }] },
                 createMarker: function() { return null; } 
@@ -297,7 +299,6 @@
                 document.getElementById('custom-nav-panel').style.display = 'block';
                 if (instructions && instructions.length > 0) updateNavigationUI(instructions[0]);
                 
-                // Sobald Route gefunden, springen wir nah an den User
                 autoFollow = true;
                 map.setView(userMarker.getLatLng(), 18);
             });
@@ -374,13 +375,11 @@
                 routingControl.setWaypoints(waypoints);
             }
 
-            // Ausrichtung des Markers (Pfeil)
             if (heading !== null) {
                 const markerIcon = document.getElementById('user-marker-icon');
                 if (markerIcon) markerIcon.style.transform = `rotate(${heading}deg)`;
             }
 
-            // Automatisches Folgen mit hohem Zoom-Level
             if (autoFollow) {
                 map.setView(currentPos, 18);
             }
@@ -429,6 +428,24 @@
             document.getElementById('duration').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
+        function toggleMapMode() {
+            const shell = document.getElementById('app-shell');
+            const icon = document.getElementById('fs-icon');
+            isMapOnlyMode = !isMapOnlyMode;
+
+            if (isMapOnlyMode) {
+                shell.classList.add('map-fullscreen-mode');
+                icon.setAttribute('data-lucide', 'minimize-2');
+            } else {
+                shell.classList.remove('map-fullscreen-mode');
+                icon.setAttribute('data-lucide', 'maximize-2');
+            }
+            
+            // Karte neu berechnen nach Layout-Änderung
+            setTimeout(() => { map.invalidateSize(); }, 350);
+            lucide.createIcons();
+        }
+
         function setupEventListeners() {
             document.getElementById('start-btn').addEventListener('click', () => {
                 if (isTracking) stopTracking(); else startTracking();
@@ -443,11 +460,9 @@
                 document.getElementById('custom-nav-panel').style.display = 'none';
                 document.getElementById('clear-route-btn').classList.add('hidden');
             });
-            document.getElementById('fullscreen-btn').addEventListener('click', () => {
-                const shell = document.getElementById('app-shell');
-                if (!document.fullscreenElement) shell.requestFullscreen().catch(() => shell.classList.toggle('pseudo-fullscreen'));
-                else document.exitFullscreen();
-            });
+            
+            // Angepasster Fullscreen-Button Logic
+            document.getElementById('fullscreen-btn').addEventListener('click', toggleMapMode);
         }
     </script>
 </body>
