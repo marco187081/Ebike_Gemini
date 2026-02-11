@@ -134,7 +134,7 @@
             z-index: 2000;
             background: rgba(20, 20, 20, 0.95);
             border: 2px solid #22c55e;
-            border-radius: 16px;
+            border-radius: 166px;
             padding: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.7);
             display: none; 
@@ -194,7 +194,7 @@
                     <div class="widget-track" id="widget-track">
                         <!-- Wetter Slide -->
                         <div class="widget-slide">
-                            <div class="absolute top-2 left-4 text-[10px] font-bold uppercase text-gray-500 tracking-widest">Wetter & Kalender</div>
+                            <div id="weather-title" class="absolute top-2 left-4 text-[10px] font-bold uppercase text-gray-500 tracking-widest">Wetter: Aktueller Ort</div>
                             
                             <!-- Current Weather Row -->
                             <div class="flex items-center justify-center space-x-6 mb-4 mt-2">
@@ -338,6 +338,7 @@
         let pathPoints = [];
         let autoFollow = true;
         let isMapOnlyMode = false;
+        let currentDestCoords = null;
         
         // Widget State
         let currentWidgetIndex = 0;
@@ -368,7 +369,7 @@
             document.getElementById('date-full').innerText = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
         }
 
-        async function fetchWeather(lat, lon) {
+        async function fetchWeather(lat, lon, isDestination = false) {
             try {
                 // Open-Meteo API
                 const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,weathercode`);
@@ -376,6 +377,9 @@
                 const cw = data.current_weather;
                 const hourly = data.hourly;
                 
+                // Update Title
+                document.getElementById('weather-title').innerText = isDestination ? "Wetter: Zielort" : "Wetter: Aktueller Ort";
+
                 // Current Weather
                 document.getElementById('weather-temp').innerText = `${Math.round(cw.temperature)}°C`;
                 
@@ -461,6 +465,8 @@
             const userCoords = userMarker.getLatLng();
             if (userCoords.lat === 0) return;
             
+            currentDestCoords = destinationCoords;
+
             if (routingControl) {
                 try {
                     map.removeControl(routingControl);
@@ -494,6 +500,9 @@
                 if (instructions && instructions.length > 0) updateNavigationUI(instructions[0]);
                 autoFollow = true;
                 map.setView(userMarker.getLatLng(), 18);
+                
+                // Fetch weather for target
+                fetchWeather(destinationCoords[0], destinationCoords[1], true);
             });
             
             document.getElementById('clear-route-btn').classList.remove('hidden');
@@ -657,8 +666,13 @@
                     try { map.removeControl(routingControl); } catch(e) {}
                     routingControl = null; 
                 }
+                currentDestCoords = null;
                 document.getElementById('custom-nav-panel').style.display = 'none';
                 document.getElementById('clear-route-btn').classList.add('hidden');
+                
+                // Reset weather to local
+                const loc = userMarker.getLatLng();
+                fetchWeather(loc.lat, loc.lng, false);
             });
             
             document.getElementById('fullscreen-btn').addEventListener('click', toggleMapMode);
