@@ -50,6 +50,7 @@
             height: 100%;
             width: 100%;
             background: #111;
+            transition: transform 0.5s ease-in-out; /* Smooth rotation */
         }
 
         .glass {
@@ -107,6 +108,11 @@
             width: 100vw !important;
             height: 100vh !important;
             z-index: 9999 !important;
+        }
+
+        /* Marker rotation to point forward */
+        #user-marker-icon {
+            transition: transform 0.3s ease;
         }
     </style>
 </head>
@@ -172,7 +178,7 @@
             </div>
         </div>
 
-        <div class="col-span-7 relative h-full">
+        <div class="col-span-7 relative h-full overflow-hidden">
             <div id="custom-nav-panel">
                 <div class="flex items-start space-x-4">
                     <div id="nav-icon-container" class="bg-green-500/20 p-3 rounded-xl">
@@ -225,6 +231,7 @@
         let lastTimestamp = null;
         let pathPoints = [];
         let autoFollow = true;
+        let currentHeading = 0;
 
         window.onload = () => {
             lucide.createIcons();
@@ -234,7 +241,7 @@
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(pos => {
                     const coords = [pos.coords.latitude, pos.coords.longitude];
-                    map.setView(coords, 16);
+                    map.setView(coords, 17);
                     updateUserMarker(pos.coords);
                     updateGpsStatus('ok', 'BEREIT');
                 }, null, { enableHighAccuracy: true });
@@ -242,10 +249,35 @@
         };
 
         function initMap() {
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([51.1657, 10.4515], 6);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-            userMarker = L.circleMarker([0, 0], { radius: 10, fillColor: "#22c55e", color: "#fff", weight: 3, opacity: 1, fillOpacity: 1 }).addTo(map);
+            // Map init mit Satelliten-Ansicht (Esri World Imagery)
+            map = L.map('map', { 
+                zoomControl: false, 
+                attributionControl: false,
+                rotate: true // Enable rotation support if browser allows
+            }).setView([51.1657, 10.4515], 6);
+
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: 'Tiles &copy; Esri'
+            }).addTo(map);
+
+            // Overlay für Straßennamen über dem Satellitenbild
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                pane: 'shadowPane'
+            }).addTo(map);
+
+            // Spezieller Richtungs-Marker (Pfeil)
+            const arrowIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div id="user-marker-icon" style="transform: rotate(0deg);"><svg width="30" height="30" viewBox="0 0 100 100"><path d="M50 5 L90 90 L50 70 L10 90 Z" fill="#22c55e" stroke="white" stroke-width="5"/></svg></div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+
+            userMarker = L.marker([0, 0], { icon: arrowIcon }).addTo(map);
             polyline = L.polyline([], { color: '#22c55e', weight: 5, opacity: 0.8 }).addTo(map);
+            
             map.on('movestart', () => { autoFollow = false; });
         }
 
@@ -314,7 +346,6 @@
             document.getElementById('start-btn').classList.replace('bg-green-600', 'bg-red-600');
             lucide.createIcons();
 
-            // Aggressives GPS-Watching
             watchId = navigator.geolocation.watchPosition(handlePositionUpdate, null, { 
                 enableHighAccuracy: true,
                 timeout: 5000,
@@ -329,11 +360,13 @@
             clearInterval(timerInterval);
             document.getElementById('start-btn').innerHTML = '<i data-lucide="play" class="w-5 h-5 mr-2 fill-current"></i> START';
             document.getElementById('start-btn').classList.replace('bg-red-600', 'bg-green-600');
+            // Reset rotation
+            document.getElementById('map').style.transform = `rotate(0deg)`;
             lucide.createIcons();
         }
 
         function handlePositionUpdate(position) {
-            const { latitude, longitude, speed, accuracy } = position.coords;
+            const { latitude, longitude, speed, accuracy, heading } = position.coords;
             const currentPos = L.latLng(latitude, longitude);
             const currentTimestamp = position.timestamp || Date.now();
 
@@ -346,32 +379,42 @@
                 routingControl.setWaypoints(waypoints);
             }
 
-            if (autoFollow) map.panTo(currentPos);
+            // Kartenausrichtung / Rotation Logik
+            if (heading !== null && speed > 0.5) {
+                currentHeading = heading;
+            } else if (lastPosition) {
+                // Berechne Heading aus Bewegung, falls Sensor-Heading fehlt
+                const angle = Math.atan2(longitude - lastPosition.lng, latitude - lastPosition.lat) * (180 / Math.PI);
+                if (currentPos.distanceTo(lastPosition) > 2) {
+                    currentHeading = (angle + 360) % 360;
+                }
+            }
+
+            if (isTracking && autoFollow) {
+                map.panTo(currentPos);
+                // Karte rotieren, sodass Fahrtrichtung oben ist
+                document.getElementById('map').style.transform = `rotate(${-currentHeading}deg)`;
+                // Marker so drehen, dass er in der Karte immer nach oben zeigt (relativ zur gedrehten Karte)
+                const markerIcon = document.getElementById('user-marker-icon');
+                if (markerIcon) markerIcon.style.transform = `rotate(${currentHeading}deg)`;
+            }
 
             if (isTracking) {
                 pathPoints.push(currentPos);
                 polyline.setLatLngs(pathPoints);
                 
-                // --- KM/H LOGIK (MAXIMALE GENAUIGKEIT) ---
                 let speedKmh = 0;
-                
-                // 1. Priorität: Sensorgeschwindigkeit
                 if (speed !== null && speed > 0.4) {
                     speedKmh = speed * 3.6;
-                } 
-                // 2. Priorität: Manuelle Berechnung (Fallback bei Langsamfahrt oder fehlenden Sensorwerten)
-                else if (lastPosition && lastTimestamp) {
+                } else if (lastPosition && lastTimestamp) {
                     const timeGapSeconds = (currentTimestamp - lastTimestamp) / 1000;
                     const distanceMeters = currentPos.distanceTo(lastPosition);
-                    
                     if (timeGapSeconds > 0.5 && distanceMeters > 1.2) {
                         speedKmh = (distanceMeters / timeGapSeconds) * 3.6;
                     }
                 }
-
                 document.getElementById('speed').innerText = speedKmh.toFixed(1);
                 
-                // Watt Berechnung
                 if (speedKmh > 1.5) {
                     const watt = Math.round((0.5 * Math.pow(speedKmh/3.6, 3) + 16 * (speedKmh/3.6)) * 1.25);
                     document.getElementById('power').innerText = watt;
@@ -379,10 +422,9 @@
                     document.getElementById('power').innerText = "0";
                 }
 
-                // Distanz Logik (Filtert GPS-Rauschen im Stand)
                 if (lastPosition && accuracy < 35) {
                     const deltaKm = currentPos.distanceTo(lastPosition) / 1000;
-                    if (deltaKm > 0.0015) { // Nur Bewegungen > 1.5 Meter zählen
+                    if (deltaKm > 0.0015) {
                         totalDistance += deltaKm;
                         document.getElementById('distance').innerText = totalDistance.toFixed(2);
                     }
@@ -417,7 +459,7 @@
             document.getElementById('reset-btn').addEventListener('click', () => { if(confirm("Alle Daten zurücksetzen?")) location.reload(); });
             document.getElementById('center-btn').addEventListener('click', () => {
                 autoFollow = true;
-                map.flyTo(userMarker.getLatLng(), 17);
+                map.flyTo(userMarker.getLatLng(), 18);
             });
             document.getElementById('clear-route-btn').addEventListener('click', () => {
                 if (routingControl) { map.removeControl(routingControl); routingControl = null; }
