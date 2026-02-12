@@ -13,7 +13,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600&display=swap');
 
         :root {
             --bg-dark: #0a0a0a;
@@ -112,21 +112,59 @@
             padding: 10px;
         }
 
-        /* --- SPEED OVERLAY ON MAP --- */
+        /* --- NEUES SPEED OVERLAY DESIGN --- */
         #speed-overlay {
             position: absolute;
-            left: 20px;
+            left: 25px;
             top: 50%;
             transform: translateY(-50%);
             z-index: 1001;
-            background: rgba(10, 10, 10, 0.4);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 24px;
+            padding: 24px 15px;
             text-align: center;
-            min-width: 160px;
+            min-width: 140px;
             pointer-events: none;
+            box-shadow: 0 0 40px rgba(0,0,0,0.5), inset 0 0 15px rgba(34, 197, 94, 0.1);
+        }
+
+        #speed {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 4.5rem;
+            line-height: 0.9;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+            letter-spacing: -2px;
+        }
+
+        .speed-unit {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 5px;
+            display: block;
+        }
+
+        .speed-gauge-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            margin-top: 15px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #speed-gauge-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #166534, #22c55e);
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+            transition: width 0.3s ease-out;
         }
 
         /* --- WIDGET SLIDER --- */
@@ -156,7 +194,6 @@
             padding: 15px;
         }
 
-        /* Improved Forecast Items */
         .forecast-item {
             display: flex;
             flex-direction: column;
@@ -387,9 +424,11 @@
             
             <!-- SPEED OVERLAY -->
             <div id="speed-overlay">
-                <div class="text-[10px] font-bold uppercase text-green-500 tracking-widest mb-1">Speed</div>
-                <div id="speed" class="digital-font text-6xl leading-none text-white">0.0</div>
-                <div class="text-xs font-bold text-gray-400 uppercase mt-2">km/h</div>
+                <div id="speed" class="digital-font">0.0</div>
+                <span class="speed-unit">km/h</span>
+                <div class="speed-gauge-container">
+                    <div id="speed-gauge-bar"></div>
+                </div>
             </div>
 
             <div id="custom-nav-panel">
@@ -703,6 +742,7 @@
             document.getElementById('start-btn').classList.replace('bg-red-600', 'bg-green-600');
             lucide.createIcons();
             document.getElementById('speed').innerText = "0.0";
+            document.getElementById('speed-gauge-bar').style.width = '0%';
         }
 
         function handlePositionUpdate(position) {
@@ -718,8 +758,15 @@
             if (isTracking) {
                 pathPoints.push(currentPos);
                 polyline.setLatLngs(pathPoints);
+                
+                // Speed Logik
                 let speedKmh = (speed !== null && speed > 0.4) ? speed * 3.6 : 0;
                 document.getElementById('speed').innerText = speedKmh.toFixed(1);
+                
+                // Gauge Bar (Max 45 km/h für E-Bike)
+                let gaugePercent = Math.min((speedKmh / 45) * 100, 100);
+                document.getElementById('speed-gauge-bar').style.width = `${gaugePercent}%`;
+
                 if (lastPosition && accuracy < 35) {
                     const deltaKm = currentPos.distanceTo(lastPosition) / 1000;
                     if (deltaKm > 0.0015) {
