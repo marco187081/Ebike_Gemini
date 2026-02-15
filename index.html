@@ -492,37 +492,61 @@
         let favoriteMarkers = [];
         let bluetoothDevice = null;
 
-        // --- BLUETOOTH LOGIC ---
+        // --- BLUETOOTH LOGIC (FIXED) ---
         async function connectBluetooth() {
             const btBtn = document.getElementById('bt-btn');
             const btIcon = document.getElementById('bt-icon');
 
+            // Wenn bereits verbunden, trennen
             if (bluetoothDevice && bluetoothDevice.gatt.connected) {
                 bluetoothDevice.gatt.disconnect();
                 btIcon.classList.remove('bt-active');
                 return;
             }
 
+            // Prüfung ob Bluetooth unterstützt wird
+            if (!navigator.bluetooth) {
+                alert("Dein Browser unterstützt kein Web Bluetooth. Nutze Chrome oder Edge.");
+                return;
+            }
+
             try {
-                // Hinweis: Web Bluetooth erfordert HTTPS und eine Nutzerinteraktion
+                // Konfiguration für breite Geräte-Kompatibilität (inkl. Lautsprecher/Media)
+                // Wir fragen nach Basis-Services, um die Verbindung zu erzwingen
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    optionalServices: ['battery_service', 'device_information']
+                    optionalServices: [
+                        'battery_service', 
+                        'device_information', 
+                        'generic_access',
+                        0x180D, // Heart Rate (Beispiel)
+                        0x180F  // Battery Service
+                    ]
                 });
 
-                btBtn.classList.add('bt-active');
+                btIcon.classList.add('bt-active');
                 
                 bluetoothDevice.addEventListener('gattserverdisconnected', () => {
                     btIcon.classList.remove('bt-active');
                 });
 
+                // GATT Server Verbindung aufbauen
                 const server = await bluetoothDevice.gatt.connect();
-                console.log("Verbunden mit " + bluetoothDevice.name);
+                console.log("Verbunden mit " + (bluetoothDevice.name || "Unbekanntes Gerät"));
             } catch (error) {
-                console.log("Bluetooth Fehler: " + error);
-                // Fallback: Wenn API nicht unterstützt wird oder abgebrochen wurde
+                console.log("Bluetooth Fehler: ", error);
+                
+                // User hat abgebrochen
                 if (error.name === 'NotFoundError') return;
-                alert("Bluetooth-Verbindung fehlgeschlagen oder nicht unterstützt.");
+                
+                // Spezifischer Fix für Berechtigungen
+                if (error.name === 'SecurityError') {
+                    alert("Bluetooth Zugriff verweigert. Bitte erlaube Bluetooth in den Browser-Einstellungen.");
+                } else {
+                    alert("Verbindung fehlgeschlagen. Stelle sicher, dass Bluetooth aktiv ist und das Gerät im Pairing-Modus.");
+                }
+                
+                btIcon.classList.remove('bt-active');
             }
         }
 
