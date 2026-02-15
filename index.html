@@ -98,19 +98,17 @@
             position: relative;
             width: 100%;
             height: 100%;
-            overflow: hidden; /* Versteckt den Überhang */
+            overflow: hidden; 
             background: #000;
         }
 
         #map-wrapper {
             position: absolute;
-            /* Massiver Überhang um Ränder bei Drehung zu vermeiden */
             top: -50%;
             left: -50%;
             width: 200%;
             height: 200%;
-            /* Glättet das "Wackeln" bei Drehungen */
-            transition: transform 1.2s cubic-bezier(0.1, 0, 0.2, 1);
+            transition: transform 0.8s cubic-bezier(0.1, 0, 0.2, 1);
             will-change: transform;
         }
 
@@ -200,7 +198,7 @@
             display: flex;
             height: 100%;
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 200%; /* Two Widgets */
+            width: 200%; 
         }
 
         .widget-slide {
@@ -253,7 +251,7 @@
         .map-fullscreen-mode #dashboard-panel { display: none; }
         .map-fullscreen-mode #map-container { grid-column: span 12 / span 12; }
 
-        #user-marker-icon { transition: none; } /* Rotation wird durch Wrapper gesteuert */
+        #user-marker-icon { transition: none; } 
         .main-container { height: 100dvh; }
 
         /* Favoriten Liste */
@@ -293,6 +291,14 @@
         #player-container { width: 95%; max-width: 650px; height: 450px; background: #111; border-radius: 32px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: none; }
         .sc-config-btn { background: rgba(255, 255, 255, 0.1); color: white; padding: 8px 16px; border-radius: 12px; font-size: 12px; transition: all 0.2s; }
         .sc-config-btn:hover { background: #ff5500; }
+
+        /* Bluetooth Status Pulse */
+        .bt-active { animation: bt-pulse 2s infinite; color: #3b82f6 !important; }
+        @keyframes bt-pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -311,12 +317,10 @@
 
     <!-- MEDIA OVERLAY -->
     <div id="media-overlay">
-        <!-- Close Button -->
         <button onclick="closeMediaCenter()" class="absolute top-6 right-6 p-4 bg-white/10 rounded-full text-white hover:bg-white/20">
             <i data-lucide="x" class="w-8 h-8"></i>
         </button>
 
-        <!-- Selection Mode -->
         <div id="media-selection" class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-8 items-center">
             <div onclick="selectMedia('soundcloud')" class="media-choice-card group">
                 <i data-lucide="music" class="w-16 h-16 mx-auto mb-4 text-[#ff5500] group-hover:scale-110 transition-transform"></i>
@@ -330,7 +334,6 @@
             </div>
         </div>
 
-        <!-- Player View -->
         <div id="player-container" class="flex-col">
             <div class="p-4 flex justify-between items-center border-b border-white/10">
                 <div class="flex items-center">
@@ -358,11 +361,9 @@
         <!-- Dashboard Panel -->
         <div id="dashboard-panel" class="col-span-5 flex flex-col p-4 space-y-4 border-r border-white/10 z-10">
             
-            <!-- WIDGET AREA -->
             <div class="flex-grow glass rounded-2xl relative overflow-hidden bg-black/20">
                 <div class="widget-container" id="widget-area">
                     <div class="widget-track" id="widget-track">
-                        <!-- Wetter Slide -->
                         <div class="widget-slide">
                             <div id="weather-title" class="absolute top-2 left-4 text-[10px] font-bold uppercase text-gray-500 tracking-widest">Wetter: Aktueller Ort</div>
                             <div class="flex items-center justify-center space-x-6 mb-4 mt-2">
@@ -374,7 +375,6 @@
                             </div>
                             <div id="hourly-forecast" class="flex justify-between w-full space-x-2 px-1"></div>
                         </div>
-                        <!-- Datum Slide -->
                         <div class="widget-slide">
                             <div id="date-weekday" class="text-green-500 font-bold text-2xl uppercase tracking-tighter mb-1">Wochentag</div>
                             <div id="date-full" class="digital-font text-3xl">--.--.----</div>
@@ -419,7 +419,6 @@
         <!-- Map Container -->
         <div id="map-container" class="col-span-7 relative h-full overflow-hidden">
             
-            <!-- SPEED OVERLAY -->
             <div id="speed-overlay">
                 <div id="speed" class="digital-font">0.0</div>
                 <span class="speed-unit">km/h</span>
@@ -441,7 +440,6 @@
                 </div>
             </div>
 
-            <!-- MAP WRAPPER SYSTEM -->
             <div id="map-outer-container">
                 <div id="map-wrapper">
                     <div id="map"></div>
@@ -449,9 +447,12 @@
             </div>
             
             <div class="absolute top-4 right-4 z-[1000] flex flex-col space-y-2">
-                <!-- MUSIC / MEDIA CENTER BUTTON -->
                 <button onclick="openMediaCenter()" class="p-3 bg-[#ff5500] hover:scale-110 transition-transform rounded-full text-white border border-white/20 shadow-xl">
                     <i data-lucide="music" class="w-5 h-5"></i>
+                </button>
+                <!-- BLUETOOTH BUTTON -->
+                <button id="bt-btn" class="p-3 bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-md rounded-full text-white border border-white/20 transition-all">
+                    <i data-lucide="bluetooth" id="bt-icon" class="w-5 h-5"></i>
                 </button>
                 <button id="fullscreen-btn" class="p-3 bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-md rounded-full text-white border border-white/20">
                     <i data-lucide="maximize-2" id="fs-icon" class="w-5 h-5"></i>
@@ -489,6 +490,41 @@
         let currentDestCoords = null, currentDestName = "", currentWidgetIndex = 0, touchStartX = 0;
         let favorites = JSON.parse(localStorage.getItem('bike_dashboard_favs') || '[]');
         let favoriteMarkers = [];
+        let bluetoothDevice = null;
+
+        // --- BLUETOOTH LOGIC ---
+        async function connectBluetooth() {
+            const btBtn = document.getElementById('bt-btn');
+            const btIcon = document.getElementById('bt-icon');
+
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                bluetoothDevice.gatt.disconnect();
+                btIcon.classList.remove('bt-active');
+                return;
+            }
+
+            try {
+                // Hinweis: Web Bluetooth erfordert HTTPS und eine Nutzerinteraktion
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['battery_service', 'device_information']
+                });
+
+                btBtn.classList.add('bt-active');
+                
+                bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+                    btIcon.classList.remove('bt-active');
+                });
+
+                const server = await bluetoothDevice.gatt.connect();
+                console.log("Verbunden mit " + bluetoothDevice.name);
+            } catch (error) {
+                console.log("Bluetooth Fehler: " + error);
+                // Fallback: Wenn API nicht unterstützt wird oder abgebrochen wurde
+                if (error.name === 'NotFoundError') return;
+                alert("Bluetooth-Verbindung fehlgeschlagen oder nicht unterstützt.");
+            }
+        }
 
         // --- MEDIA CENTER LOGIC ---
         const DEFAULT_SC_URL = "https://soundcloud.com/chillhopdotcom/sets/chillhop-radio-lofi-hip-hop";
@@ -550,6 +586,7 @@
                     updateUserMarker(pos.coords);
                     updateGpsStatus('ok', 'BEREIT');
                     fetchWeather(pos.coords.latitude, pos.coords.longitude);
+                    watchId = navigator.geolocation.watchPosition(handlePositionUpdate, null, { enableHighAccuracy: true });
                 }, null, { enableHighAccuracy: true });
             }
         };
@@ -608,9 +645,9 @@
             map = L.map('map', { 
                 zoomControl: false, 
                 attributionControl: false,
-                dragging: false, 
-                touchZoom: false,
-                scrollWheelZoom: false 
+                dragging: true, 
+                touchZoom: true,
+                scrollWheelZoom: true 
             }).setView([51.1657, 10.4515], 6);
             
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
@@ -623,8 +660,7 @@
             });
             userMarker = L.marker([0, 0], { icon: arrowIcon }).addTo(map);
             polyline = L.polyline([], { color: '#22c55e', weight: 5, opacity: 0.8 }).addTo(map);
-            
-            map.on('movestart', () => { autoFollow = false; });
+            map.on('dragstart', () => { autoFollow = false; });
         }
 
         function calculateRoute(destinationCoords, name = "") {
@@ -732,18 +768,17 @@
             document.getElementById('start-btn').innerHTML = '<i data-lucide="pause" class="w-5 h-5 mr-2 fill-current"></i> STOPP';
             document.getElementById('start-btn').classList.replace('bg-green-600', 'bg-red-600');
             lucide.createIcons();
-            watchId = navigator.geolocation.watchPosition(handlePositionUpdate, null, { enableHighAccuracy: true });
             timerInterval = setInterval(updateTimer, 1000);
+            if (lastPosition) map.setView(lastPosition, 18);
         }
 
         function stopTracking() {
-            isTracking = false; navigator.geolocation.clearWatch(watchId); clearInterval(timerInterval);
+            isTracking = false; clearInterval(timerInterval);
             document.getElementById('start-btn').innerHTML = '<i data-lucide="play" class="w-5 h-5 mr-2 fill-current"></i> START';
             document.getElementById('start-btn').classList.replace('bg-red-600', 'bg-green-600');
             lucide.createIcons();
             document.getElementById('speed').innerText = "0.0";
             document.getElementById('speed-gauge-bar').style.width = '0%';
-            // Reset rotation
             document.getElementById('map-wrapper').style.transform = 'rotate(0deg)';
         }
 
@@ -751,20 +786,19 @@
             const { latitude, longitude, speed, accuracy, heading } = position.coords;
             const currentPos = L.latLng(latitude, longitude);
             updateUserMarker(position.coords);
-            updateGpsStatus('ok', accuracy < 15 ? 'AKTIV' : 'SCHWACH');
+            updateGpsStatus('ok', accuracy < 20 ? 'AKTIV' : 'SCHWACH');
             
-            // MAP FOLLOW & ROTATION (STABILIZED)
             if (autoFollow) {
-                map.setView(currentPos, map.getZoom(), { animate: false });
-                
-                // Nutze den Wrapper zur Drehung um Ränder zu vermeiden
-                if (heading !== null && speed > 1) { 
-                    document.getElementById('map-wrapper').style.transform = `rotate(${-heading}deg)`;
-                    const markerIcon = document.getElementById('user-marker-icon');
-                    if (markerIcon) markerIcon.style.transform = `rotate(0deg)`;
-                } else if (heading !== null) {
-                    const markerIcon = document.getElementById('user-marker-icon');
-                    if (markerIcon) markerIcon.style.transform = `rotate(${heading}deg)`;
+                map.setView(currentPos, map.getZoom(), { animate: true, duration: 0.5 });
+                if (heading !== null && heading !== undefined) { 
+                    if (speed > 0.5 || routingControl) {
+                        document.getElementById('map-wrapper').style.transform = `rotate(${-heading}deg)`;
+                        const markerIcon = document.getElementById('user-marker-icon');
+                        if (markerIcon) markerIcon.style.transform = `rotate(0deg)`;
+                    } else {
+                        const markerIcon = document.getElementById('user-marker-icon');
+                        if (markerIcon) markerIcon.style.transform = `rotate(${heading}deg)`;
+                    }
                 }
             }
 
@@ -776,7 +810,7 @@
                 document.getElementById('speed-gauge-bar').style.width = `${gaugePercent}%`;
                 if (lastPosition && accuracy < 35) {
                     const deltaKm = currentPos.distanceTo(lastPosition) / 1000;
-                    if (deltaKm > 0.0015) { totalDistance += deltaKm; document.getElementById('distance').innerText = totalDistance.toFixed(2); }
+                    if (deltaKm > 0.001) { totalDistance += deltaKm; document.getElementById('distance').innerText = totalDistance.toFixed(2); }
                 }
             }
             lastPosition = currentPos;
@@ -818,6 +852,7 @@
                 autoFollow = true; 
                 map.flyTo(userMarker.getLatLng(), 18);
             });
+            document.getElementById('bt-btn').addEventListener('click', connectBluetooth);
             document.getElementById('clear-route-btn').addEventListener('click', () => {
                 if (routingControl) { try { map.removeControl(routingControl); } catch(e) {} routingControl = null; }
                 currentDestCoords = null; currentDestName = "";
@@ -825,6 +860,7 @@
                 document.getElementById('clear-route-btn').classList.add('hidden');
                 const loc = userMarker.getLatLng(); fetchWeather(loc.lat, loc.lng, false);
                 document.getElementById('map-wrapper').style.transform = 'rotate(0deg)';
+                autoFollow = true;
             });
             document.getElementById('fullscreen-btn').addEventListener('click', toggleMapMode);
             document.getElementById('save-location-btn').addEventListener('click', saveFavorite);
