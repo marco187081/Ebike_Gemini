@@ -98,16 +98,18 @@
             position: relative;
             width: 100%;
             height: 100%;
-            overflow: hidden; 
+            overflow: hidden; /* Versteckt den Überhang */
             background: #000;
         }
 
         #map-wrapper {
             position: absolute;
+            /* Massiver Überhang um Ränder bei Drehung zu vermeiden */
             top: -50%;
             left: -50%;
             width: 200%;
             height: 200%;
+            /* Glättet das "Wackeln" bei Drehungen */
             transition: transform 0.8s cubic-bezier(0.1, 0, 0.2, 1);
             will-change: transform;
         }
@@ -198,7 +200,7 @@
             display: flex;
             height: 100%;
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 200%; 
+            width: 200%; /* Two Widgets */
         }
 
         .widget-slide {
@@ -251,7 +253,7 @@
         .map-fullscreen-mode #dashboard-panel { display: none; }
         .map-fullscreen-mode #map-container { grid-column: span 12 / span 12; }
 
-        #user-marker-icon { transition: none; } 
+        #user-marker-icon { transition: none; } /* Rotation wird durch Wrapper gesteuert */
         .main-container { height: 100dvh; }
 
         /* Favoriten Liste */
@@ -291,14 +293,6 @@
         #player-container { width: 95%; max-width: 650px; height: 450px; background: #111; border-radius: 32px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: none; }
         .sc-config-btn { background: rgba(255, 255, 255, 0.1); color: white; padding: 8px 16px; border-radius: 12px; font-size: 12px; transition: all 0.2s; }
         .sc-config-btn:hover { background: #ff5500; }
-
-        /* Bluetooth Status Pulse */
-        .bt-active { animation: bt-pulse 2s infinite; color: #3b82f6 !important; }
-        @keyframes bt-pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
     </style>
 </head>
 <body>
@@ -317,10 +311,12 @@
 
     <!-- MEDIA OVERLAY -->
     <div id="media-overlay">
+        <!-- Close Button -->
         <button onclick="closeMediaCenter()" class="absolute top-6 right-6 p-4 bg-white/10 rounded-full text-white hover:bg-white/20">
             <i data-lucide="x" class="w-8 h-8"></i>
         </button>
 
+        <!-- Selection Mode -->
         <div id="media-selection" class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-8 items-center">
             <div onclick="selectMedia('soundcloud')" class="media-choice-card group">
                 <i data-lucide="music" class="w-16 h-16 mx-auto mb-4 text-[#ff5500] group-hover:scale-110 transition-transform"></i>
@@ -334,6 +330,7 @@
             </div>
         </div>
 
+        <!-- Player View -->
         <div id="player-container" class="flex-col">
             <div class="p-4 flex justify-between items-center border-b border-white/10">
                 <div class="flex items-center">
@@ -361,9 +358,11 @@
         <!-- Dashboard Panel -->
         <div id="dashboard-panel" class="col-span-5 flex flex-col p-4 space-y-4 border-r border-white/10 z-10">
             
+            <!-- WIDGET AREA -->
             <div class="flex-grow glass rounded-2xl relative overflow-hidden bg-black/20">
                 <div class="widget-container" id="widget-area">
                     <div class="widget-track" id="widget-track">
+                        <!-- Wetter Slide -->
                         <div class="widget-slide">
                             <div id="weather-title" class="absolute top-2 left-4 text-[10px] font-bold uppercase text-gray-500 tracking-widest">Wetter: Aktueller Ort</div>
                             <div class="flex items-center justify-center space-x-6 mb-4 mt-2">
@@ -375,6 +374,7 @@
                             </div>
                             <div id="hourly-forecast" class="flex justify-between w-full space-x-2 px-1"></div>
                         </div>
+                        <!-- Datum Slide -->
                         <div class="widget-slide">
                             <div id="date-weekday" class="text-green-500 font-bold text-2xl uppercase tracking-tighter mb-1">Wochentag</div>
                             <div id="date-full" class="digital-font text-3xl">--.--.----</div>
@@ -419,6 +419,7 @@
         <!-- Map Container -->
         <div id="map-container" class="col-span-7 relative h-full overflow-hidden">
             
+            <!-- SPEED OVERLAY -->
             <div id="speed-overlay">
                 <div id="speed" class="digital-font">0.0</div>
                 <span class="speed-unit">km/h</span>
@@ -440,6 +441,7 @@
                 </div>
             </div>
 
+            <!-- MAP WRAPPER SYSTEM -->
             <div id="map-outer-container">
                 <div id="map-wrapper">
                     <div id="map"></div>
@@ -447,12 +449,9 @@
             </div>
             
             <div class="absolute top-4 right-4 z-[1000] flex flex-col space-y-2">
+                <!-- MUSIC / MEDIA CENTER BUTTON -->
                 <button onclick="openMediaCenter()" class="p-3 bg-[#ff5500] hover:scale-110 transition-transform rounded-full text-white border border-white/20 shadow-xl">
                     <i data-lucide="music" class="w-5 h-5"></i>
-                </button>
-                <!-- BLUETOOTH BUTTON -->
-                <button id="bt-btn" class="p-3 bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-md rounded-full text-white border border-white/20 transition-all">
-                    <i data-lucide="bluetooth" id="bt-icon" class="w-5 h-5"></i>
                 </button>
                 <button id="fullscreen-btn" class="p-3 bg-zinc-900/80 hover:bg-zinc-800 backdrop-blur-md rounded-full text-white border border-white/20">
                     <i data-lucide="maximize-2" id="fs-icon" class="w-5 h-5"></i>
@@ -490,65 +489,6 @@
         let currentDestCoords = null, currentDestName = "", currentWidgetIndex = 0, touchStartX = 0;
         let favorites = JSON.parse(localStorage.getItem('bike_dashboard_favs') || '[]');
         let favoriteMarkers = [];
-        let bluetoothDevice = null;
-
-        // --- BLUETOOTH LOGIC (FIXED) ---
-        async function connectBluetooth() {
-            const btBtn = document.getElementById('bt-btn');
-            const btIcon = document.getElementById('bt-icon');
-
-            // Wenn bereits verbunden, trennen
-            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
-                bluetoothDevice.gatt.disconnect();
-                btIcon.classList.remove('bt-active');
-                return;
-            }
-
-            // Prüfung ob Bluetooth unterstützt wird
-            if (!navigator.bluetooth) {
-                alert("Dein Browser unterstützt kein Web Bluetooth. Nutze Chrome oder Edge.");
-                return;
-            }
-
-            try {
-                // Konfiguration für breite Geräte-Kompatibilität (inkl. Lautsprecher/Media)
-                // Wir fragen nach Basis-Services, um die Verbindung zu erzwingen
-                bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [
-                        'battery_service', 
-                        'device_information', 
-                        'generic_access',
-                        0x180D, // Heart Rate (Beispiel)
-                        0x180F  // Battery Service
-                    ]
-                });
-
-                btIcon.classList.add('bt-active');
-                
-                bluetoothDevice.addEventListener('gattserverdisconnected', () => {
-                    btIcon.classList.remove('bt-active');
-                });
-
-                // GATT Server Verbindung aufbauen
-                const server = await bluetoothDevice.gatt.connect();
-                console.log("Verbunden mit " + (bluetoothDevice.name || "Unbekanntes Gerät"));
-            } catch (error) {
-                console.log("Bluetooth Fehler: ", error);
-                
-                // User hat abgebrochen
-                if (error.name === 'NotFoundError') return;
-                
-                // Spezifischer Fix für Berechtigungen
-                if (error.name === 'SecurityError') {
-                    alert("Bluetooth Zugriff verweigert. Bitte erlaube Bluetooth in den Browser-Einstellungen.");
-                } else {
-                    alert("Verbindung fehlgeschlagen. Stelle sicher, dass Bluetooth aktiv ist und das Gerät im Pairing-Modus.");
-                }
-                
-                btIcon.classList.remove('bt-active');
-            }
-        }
 
         // --- MEDIA CENTER LOGIC ---
         const DEFAULT_SC_URL = "https://soundcloud.com/chillhopdotcom/sets/chillhop-radio-lofi-hip-hop";
@@ -610,6 +550,7 @@
                     updateUserMarker(pos.coords);
                     updateGpsStatus('ok', 'BEREIT');
                     fetchWeather(pos.coords.latitude, pos.coords.longitude);
+                    // Starte watchPosition sofort für korrekte Initialisierung
                     watchId = navigator.geolocation.watchPosition(handlePositionUpdate, null, { enableHighAccuracy: true });
                 }, null, { enableHighAccuracy: true });
             }
@@ -684,6 +625,8 @@
             });
             userMarker = L.marker([0, 0], { icon: arrowIcon }).addTo(map);
             polyline = L.polyline([], { color: '#22c55e', weight: 5, opacity: 0.8 }).addTo(map);
+            
+            // Wenn der Nutzer die Karte zieht, stoppt das Auto-Following
             map.on('dragstart', () => { autoFollow = false; });
         }
 
@@ -803,6 +746,7 @@
             lucide.createIcons();
             document.getElementById('speed').innerText = "0.0";
             document.getElementById('speed-gauge-bar').style.width = '0%';
+            // Reset rotation
             document.getElementById('map-wrapper').style.transform = 'rotate(0deg)';
         }
 
@@ -812,14 +756,20 @@
             updateUserMarker(position.coords);
             updateGpsStatus('ok', accuracy < 20 ? 'AKTIV' : 'SCHWACH');
             
+            // MAP FOLLOW & ROTATION (FIXED)
+            // Wir folgen der Position immer wenn autoFollow true ist, egal ob Tracking an ist oder nicht
             if (autoFollow) {
                 map.setView(currentPos, map.getZoom(), { animate: true, duration: 0.5 });
+                
+                // Drehung der Karte basierend auf der Fahrtrichtung
                 if (heading !== null && heading !== undefined) { 
+                    // Nur drehen wenn wir uns bewegen oder eine Route aktiv ist
                     if (speed > 0.5 || routingControl) {
                         document.getElementById('map-wrapper').style.transform = `rotate(${-heading}deg)`;
                         const markerIcon = document.getElementById('user-marker-icon');
                         if (markerIcon) markerIcon.style.transform = `rotate(0deg)`;
                     } else {
+                        // Im Stehen dreht sich nur der Pfeil
                         const markerIcon = document.getElementById('user-marker-icon');
                         if (markerIcon) markerIcon.style.transform = `rotate(${heading}deg)`;
                     }
@@ -876,7 +826,6 @@
                 autoFollow = true; 
                 map.flyTo(userMarker.getLatLng(), 18);
             });
-            document.getElementById('bt-btn').addEventListener('click', connectBluetooth);
             document.getElementById('clear-route-btn').addEventListener('click', () => {
                 if (routingControl) { try { map.removeControl(routingControl); } catch(e) {} routingControl = null; }
                 currentDestCoords = null; currentDestName = "";
